@@ -34,5 +34,15 @@ def top_municipios():
     top = df["MUNICIPIO"].value_counts().head(5).to_dict()
     return jsonify(top)
 
+# Filtrar por categoría
+@app.route("/api/categoria/<nombre>")
+def por_categoria(nombre):
+    try:
+        filtro = df[df["CATEGORIA"].str.lower() == nombre.lower()]
+        return jsonify(filtro.to_dict(orient="records"))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
