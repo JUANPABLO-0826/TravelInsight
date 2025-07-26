@@ -113,6 +113,7 @@ def resumen_por_categoria(nombre):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 @app.route("/api/municipio/<nombre>/categorias")
 def categorias_por_municipio(nombre):
     try:
@@ -120,6 +121,22 @@ def categorias_por_municipio(nombre):
         return jsonify({ "municipio": nombre, "categorias": categorias })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/filtrar")
+def filtrar_categoria_municipio():
+    municipio = request.args.get("municipio", "").lower()
+    categoria = request.args.get("categoria", "").lower()
+
+    try:
+        filtro = df[
+            (df["MUNICIPIO"].str.lower() == municipio) &
+            (df["CATEGORIA"].str.lower() == categoria)
+        ]
+        return jsonify(filtro.to_dict(orient="records"))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 
 if __name__ == "__main__":
