@@ -13,7 +13,14 @@ df = pd.read_csv("rnt_limpio.csv")
 # Conexión a la base de datos PostgreSQL
 DATABASE_URL = os.environ.get("DATABASE_URL", 
     "postgresql://travelinsight_db_user:Js0QSu3ilo6P3ye0LlpIn3ee4LwisZ2E@dpg-d221vhje5dus7396s19g-a/travelinsight_db")
-conn = psycopg2.connect(DATABASE_URL)
+
+# Manejo de errores
+try:
+    conn = psycopg2.connect(DATABASE_URL)
+except Exception as e:
+    print("❌ Error conectando a PostgreSQL:", e)
+    conn = None
+
 
 # Crear tabla si no existe
 with conn.cursor() as cur:
