@@ -56,7 +56,15 @@ if conn:
 # ========== ENDPOINTS ==========
 @app.route("/")
 def index():
-    return "✅ API Travel Insight funcionando"
+    return jsonify({
+      "status": "active",
+      "version": "1.0.0",
+      "endpoints": [
+        { "path": "/api/municipios", "desc": "Lista municipios" },
+        { "path": "/api/categorias", "desc": "Lista categorías" },
+        …
+      ]
+    })
 
 @app.route("/api/formulario", methods=["POST"])
 def guardar_formulario():
