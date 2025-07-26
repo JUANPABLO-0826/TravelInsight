@@ -7,15 +7,15 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-# Carga tu CSV
+# Cargar el archivo CSV
 df = pd.read_csv("rnt_limpio.csv")
 
-# Conexión a Postgres (usa la URL de Render como variable de entorno o hardcodeada)
+# Conexión a la base de datos PostgreSQL
 DATABASE_URL = os.environ.get("DATABASE_URL", 
     "postgresql://travelinsight_db_user:Js0QSu3ilo6P3ye0LlpIn3ee4LwisZ2E@dpg-d221vhje5dus7396s19g-a/travelinsight_db")
 conn = psycopg2.connect(DATABASE_URL)
 
-# 1) Asegurarnos de que la tabla existe
+# Crear tabla si no existe
 with conn.cursor() as cur:
     cur.execute("""
         CREATE TABLE IF NOT EXISTS respuestas_formulario (
@@ -29,15 +29,13 @@ with conn.cursor() as cur:
     """)
     conn.commit()
 
-# 2) Endpoint POST para guardar respuestas
+# POST: Guardar respuestas del formulario
 @app.route("/api/formulario", methods=["POST"])
 def guardar_formulario():
     data = request.get_json(force=True)
-    # Validación básica
     for key in ("viajas_con", "interes_viaje", "duracion_viaje", "clima_preferencia"):
         if key not in data:
             return jsonify({"error": f"Falta campo '{key}'"}), 400
-
     with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO respuestas_formulario 
@@ -50,21 +48,22 @@ def guardar_formulario():
             data["clima_preferencia"]
         ))
         conn.commit()
-
     return jsonify({"mensaje": "✅ Formulario registrado"}), 201
 
-# 3) Opcional: GET para consultar todas las respuestas
+# GET: Consultar respuestas
 @app.route("/api/formulario", methods=["GET"])
 def leer_formularios():
     with conn.cursor() as cur:
-        cur.execute("SELECT id, viajas_con, interes_viaje, duracion_viaje, clima_preferencia, fecha FROM respuestas_formulario ORDER BY fecha DESC;")
+        cur.execute("""
+            SELECT id, viajas_con, interes_viaje, duracion_viaje, clima_preferencia, fecha 
+            FROM respuestas_formulario ORDER BY fecha DESC;
+        """)
         rows = cur.fetchall()
         cols = [desc[0] for desc in cur.description]
-    # Transformar a lista de dicts
     resultados = [dict(zip(cols, row)) for row in rows]
     return jsonify(resultados)
 
-# --- Tus endpoints existentes ---
+# --- Endpoints previos ---
 @app.route("/")
 def index():
     return "✅ API Travel Insight en Render funcionando"
@@ -92,8 +91,11 @@ def top_municipios():
 
 @app.route("/api/categoria/<nombre>")
 def por_categoria(nombre):
-    filtro = df[df["CATEGORIA"].str.lower() == nombre.lower()]
-    return jsonify(filtro.to_dict(orient="records"))
+    try:
+        filtro = df[df["CATEGORIA"].str.lower() == nombre.lower()]
+        return jsonify(filtro.to_dict(orient="records"))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
