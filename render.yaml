@@ -2,6 +2,5 @@ services:
   - type: web
     name: travelinsight
     runtime: python
-    pythonVersion: "3.9"  # Especifica versión aquí
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
