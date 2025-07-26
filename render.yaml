@@ -1,6 +1,7 @@
 services:
   - type: web
     name: travelinsight
-    runtime: python
+    env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: python app.py
+    plan: free
