@@ -62,7 +62,6 @@ def index():
       "endpoints": [
         { "path": "/api/municipios", "desc": "Lista municipios" },
         { "path": "/api/categorias", "desc": "Lista categorías" },
-        …
       ]
     })
 
