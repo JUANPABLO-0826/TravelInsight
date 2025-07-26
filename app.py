@@ -113,5 +113,14 @@ def resumen_por_categoria(nombre):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/municipio/<nombre>/categorias")
+def categorias_por_municipio(nombre):
+    try:
+        categorias = df[df["MUNICIPIO"].str.lower() == nombre.lower()]["CATEGORIA"].dropna().unique().tolist()
+        return jsonify({ "municipio": nombre, "categorias": categorias })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
