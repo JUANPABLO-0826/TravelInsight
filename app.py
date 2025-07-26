@@ -3,40 +3,61 @@ from flask_cors import CORS
 import pandas as pd
 import psycopg2
 import os
+import unicodedata
 
 app = Flask(__name__)
 CORS(app)
 
-# Cargar el archivo CSV
-df = pd.read_csv("rnt_limpio.csv")
+# ========== UTILIDAD PARA NORMALIZAR ==========
+def normalizar(texto):
+    if not isinstance(texto, str):
+        return ""
+    texto = unicodedata.normalize("NFKD", texto).encode("ASCII", "ignore").decode("utf-8")
+    return texto.strip().upper()
 
-# Conexión a la base de datos PostgreSQL
+# ========== CARGA DE DATOS ==========
+try:
+    df = pd.read_csv("rnt_limpio.csv")
+
+    # Normalizamos campos clave
+    df["MUNICIPIO"] = df["MUNICIPIO"].apply(normalizar)
+    df["CATEGORIA"] = df["CATEGORIA"].apply(normalizar)
+    print("✅ CSV cargado y normalizado")
+except Exception as e:
+    print("❌ Error cargando CSV:", e)
+    df = pd.DataFrame()
+
+# ========== CONEXIÓN A BASE DE DATOS ==========
 DATABASE_URL = os.environ.get("DATABASE_URL", 
     "postgresql://travelinsight_db_user:Js0QSu3ilo6P3ye0LlpIn3ee4LwisZ2E@dpg-d221vhje5dus7396s19g-a/travelinsight_db")
 
-# Manejo de errores
 try:
     conn = psycopg2.connect(DATABASE_URL)
+    print("✅ Conexión a PostgreSQL exitosa")
 except Exception as e:
     print("❌ Error conectando a PostgreSQL:", e)
     conn = None
 
+# ========== CREAR TABLA SI NO EXISTE ==========
+if conn:
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS respuestas_formulario (
+                id SERIAL PRIMARY KEY,
+                viajas_con VARCHAR(50),
+                interes_viaje VARCHAR(50),
+                duracion_viaje VARCHAR(100),
+                clima_preferencia VARCHAR(100),
+                fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.commit()
 
-# Crear tabla si no existe
-with conn.cursor() as cur:
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS respuestas_formulario (
-            id SERIAL PRIMARY KEY,
-            viajas_con VARCHAR(50),
-            interes_viaje VARCHAR(50),
-            duracion_viaje VARCHAR(100),
-            clima_preferencia VARCHAR(100),
-            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-    """)
-    conn.commit()
+# ========== ENDPOINTS ==========
+@app.route("/")
+def index():
+    return "✅ API Travel Insight funcionando"
 
-# POST: Guardar respuestas del formulario
 @app.route("/api/formulario", methods=["POST"])
 def guardar_formulario():
     data = request.get_json(force=True)
@@ -57,7 +78,6 @@ def guardar_formulario():
         conn.commit()
     return jsonify({"mensaje": "✅ Formulario registrado"}), 201
 
-# GET: Consultar respuestas
 @app.route("/api/formulario", methods=["GET"])
 def leer_formularios():
     with conn.cursor() as cur:
@@ -70,26 +90,22 @@ def leer_formularios():
     resultados = [dict(zip(cols, row)) for row in rows]
     return jsonify(resultados)
 
-# --- Endpoints previos ---
-@app.route("/")
-def index():
-    return "✅ API Travel Insight en Render funcionando"
-
 @app.route("/api/destinos")
 def destinos():
     return jsonify(df.head(10).to_dict(orient="records"))
 
 @app.route("/api/municipios")
 def municipios():
-    return jsonify(df["MUNICIPIO"].dropna().unique().tolist())
+    return jsonify(sorted(df["MUNICIPIO"].dropna().unique().tolist()))
 
 @app.route("/api/categorias")
 def categorias():
-    return jsonify(df["CATEGORIA"].dropna().unique().tolist())
+    return jsonify(sorted(df["CATEGORIA"].dropna().unique().tolist()))
 
 @app.route("/api/destinos/<municipio>")
 def destinos_por_municipio(municipio):
-    filtro = df[df["MUNICIPIO"].str.lower() == municipio.lower()]
+    municipio = normalizar(municipio)
+    filtro = df[df["MUNICIPIO"] == municipio]
     return jsonify(filtro.to_dict(orient="records"))
 
 @app.route("/api/top-municipios")
@@ -99,7 +115,8 @@ def top_municipios():
 @app.route("/api/categoria/<nombre>")
 def por_categoria(nombre):
     try:
-        filtro = df[df["CATEGORIA"].str.lower() == nombre.lower()]
+        nombre = normalizar(nombre)
+        filtro = df[df["CATEGORIA"] == nombre]
         return jsonify(filtro.to_dict(orient="records"))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -107,38 +124,38 @@ def por_categoria(nombre):
 @app.route("/api/categoria/<nombre>/resumen")
 def resumen_por_categoria(nombre):
     try:
-        filtro = df[df["CATEGORIA"].str.lower() == nombre.lower()]
+        nombre = normalizar(nombre)
+        filtro = df[df["CATEGORIA"] == nombre]
         conteo = filtro["MUNICIPIO"].value_counts().to_dict()
-        return jsonify({nombre.upper(): conteo})
+        return jsonify({nombre: conteo})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 @app.route("/api/municipio/<nombre>/categorias")
 def categorias_por_municipio(nombre):
     try:
-        categorias = df[df["MUNICIPIO"].str.lower() == nombre.lower()]["CATEGORIA"].dropna().unique().tolist()
+        nombre = normalizar(nombre)
+        categorias = df[df["MUNICIPIO"] == nombre]["CATEGORIA"].dropna().unique().tolist()
         return jsonify({ "municipio": nombre, "categorias": categorias })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
 @app.route("/api/filtrar")
 def filtrar_categoria_municipio():
-    municipio = request.args.get("municipio", "").lower()
-    categoria = request.args.get("categoria", "").lower()
+    municipio = normalizar(request.args.get("municipio", ""))
+    categoria = normalizar(request.args.get("categoria", ""))
 
     try:
-        filtro = df[
-            (df["MUNICIPIO"].str.lower() == municipio) &
-            (df["CATEGORIA"].str.lower() == categoria)
-        ]
+        filtro = df.copy()
+        if municipio:
+            filtro = filtro[filtro["MUNICIPIO"] == municipio]
+        if categoria:
+            filtro = filtro[filtro["CATEGORIA"] == categoria]
         return jsonify(filtro.to_dict(orient="records"))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-
+# ========== INICIO ==========
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
 
