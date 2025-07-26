@@ -104,5 +104,14 @@ def por_categoria(nombre):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/categoria/<nombre>/resumen")
+def resumen_por_categoria(nombre):
+    try:
+        filtro = df[df["CATEGORIA"].str.lower() == nombre.lower()]
+        conteo = filtro["MUNICIPIO"].value_counts().to_dict()
+        return jsonify({nombre.upper(): conteo})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
